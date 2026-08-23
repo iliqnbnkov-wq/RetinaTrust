@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "protocol_version": "0.4.0",
+  "status": "frozen_before_external_results",
+  "frozen_at_utc": "2026-08-23T13:21:28Z",
+  "description": "Zero-shot DeepDRiD external-validation protocol for the unchanged RetinaTrust v0.3 model. This file contains no external results.",
+  "model_path": "artifacts/v0.3/retina_baseline.joblib",
+  "dataset": {
+    "name": "DeepDRiD regular fundus",
+    "official_repository": "https://github.com/deepdrdoc/DeepDRiD",
+    "source_commit": "56d8af71319803150d0e7b90533e0918c7bf85ee",
+    "partitions": [
+      "regular-fundus-training",
+      "regular-fundus-validation"
+    ],
+    "primary_unit": "image",
+    "uncertainty_unit": "patient cluster",
+    "referable_dr_mapping": "eye DR grade >= 2 for grades 0-4",
+    "grade_5_policy": "quality analysis only; excluded from binary DR denominators",
+    "quality_mapping": "Overall quality 1 = good enough; 0 = not good enough"
+  },
+  "thresholds": {
+    "classification": 0.5,
+    "confidence_floor": 0.85,
+    "quality_intervention": "review or fail",
+    "quality_recapture": "fail only"
+  },
+  "bootstrap": {
+    "method": "patient-clustered nonparametric bootstrap",
+    "samples": 2000,
+    "seed": 20260823,
+    "confidence_level": 0.95
+  },
+  "adaptation": {
+    "training_on_external_data": false,
+    "recalibration_on_external_data": false,
+    "threshold_selection_on_external_data": false
+  },
+  "files": [
+    {
+      "path": "artifacts/v0.3/retina_baseline.joblib",
+      "sha256": "8731745938510384a4c06a3a0e7738044cb430dec3ef29919e1715b7be4796e7",
+      "role": "Frozen calibrated v0.3 model and thresholds"
+    },
+    {
+      "path": "retina_poc/core.py",
+      "sha256": "19725898dd13162509dec4f490831e70fbc599acbea7f31b1b6430fd4107393f",
+      "role": "Canonical preprocessing and feature extraction"
+    },
+    {
+      "path": "retina_poc/modeling.py",
+      "sha256": "34427c0b1f3dd6f3891486f8571d72ff7141f3bcc57f4b09dce895117e230843",
+      "role": "Quality scoring and frozen model interface"
+    },
+    {
+      "path": "retina_poc/external_validation.py",
+      "sha256": "6183e8000b3aba1ed9fa6254a9aec9c92115c6e927aa8a584dce38b1ac4876e5",
+      "role": "DeepDRiD parser, metrics, aggregation and clustered bootstrap"
+    },
+    {
+      "path": "scripts/evaluate_external.py",
+      "sha256": "fa5cf86d850a2ea38aa0f57504da594096b3ae30b84d0dff123b1716c8ac7aee",
+      "role": "Frozen external-validation runner"
+    },
+    {
+      "path": "requirements.lock",
+      "sha256": "3ee37bcb259496f74d766f5d9fe9d57c9cd42510ae9ae3f956aa5b6ff7c4d6d3",
+      "role": "Pinned Python dependency environment"
+    },
+    {
+      "path": "docs/EXTERNAL_VALIDATION_PROTOCOL_BG.md",
+      "sha256": "0501066d2259f3b31c062d646653e3ed26516c402495a3274ba609168c7f73e5",
+      "role": "Human-readable pre-result protocol"
+    }
+  ],
+  "planned_outputs": [
+    "deepdrid_predictions.csv",
+    "deepdrid_eye_aggregation.csv",
+    "deepdrid_patient_aggregation.csv",
+    "deepdrid_external_metrics.json"
+  ]
+}

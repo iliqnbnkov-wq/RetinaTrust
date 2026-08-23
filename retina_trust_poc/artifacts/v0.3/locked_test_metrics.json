@@ -1,0 +1,101 @@
+{
+  "n": 103,
+  "threshold": 0.5,
+  "auroc": 0.7199519230769231,
+  "sensitivity": 0.859375,
+  "specificity": 0.358974358974359,
+  "f1": 0.7638888888888888,
+  "macro_f1": 0.6077508960573477,
+  "balanced_accuracy": 0.6091746794871795,
+  "brier": 0.20668377632012533,
+  "nll": 0.5907259318926734,
+  "ece": 0.08736884736177095,
+  "confusion_matrix": [
+    [
+      14,
+      25
+    ],
+    [
+      9,
+      55
+    ]
+  ],
+  "bootstrap_95_ci": {
+    "auroc": [
+      0.6185501012145749,
+      0.8121105560279667
+    ],
+    "macro_f1": [
+      0.504568394684582,
+      0.701077943615257
+    ],
+    "balanced_accuracy": [
+      0.5259723559615077,
+      0.6973712260301919
+    ]
+  },
+  "risk_coverage": [
+    {
+      "coverage": 0.0971,
+      "risk": 0.0
+    },
+    {
+      "coverage": 0.2039,
+      "risk": 0.0476
+    },
+    {
+      "coverage": 0.301,
+      "risk": 0.1613
+    },
+    {
+      "coverage": 0.3981,
+      "risk": 0.1951
+    },
+    {
+      "coverage": 0.5049,
+      "risk": 0.2115
+    },
+    {
+      "coverage": 0.6019,
+      "risk": 0.2419
+    },
+    {
+      "coverage": 0.699,
+      "risk": 0.25
+    },
+    {
+      "coverage": 0.7961,
+      "risk": 0.2927
+    },
+    {
+      "coverage": 0.9029,
+      "risk": 0.3333
+    },
+    {
+      "coverage": 1.0,
+      "risk": 0.3301
+    }
+  ],
+  "model_selection": {
+    "best_C": 1.0,
+    "internal_cv_auroc": 0.869880795990853,
+    "oof_ece": 0.10633324008833406,
+    "review_policy_from_oof": {
+      "threshold": 0.62,
+      "coverage": 0.7554479418886199,
+      "risk": 0.14423076923076927
+    },
+    "deployed_confidence_floor": 0.85
+  },
+  "data": {
+    "dataset": "IDRiD B. Disease Grading",
+    "train_images": 413,
+    "locked_test_images": 103,
+    "target": "Referable DR (grade >= 2)",
+    "train_positive": 259,
+    "test_positive": 64,
+    "preprocessing": "Shared max-dimension 1024px LANCZOS path before feature extraction",
+    "official_test_split_reused_after_protocol_correction": true,
+    "test_labels_used_for_model_fitting_or_threshold_selection": false
+  }
+}

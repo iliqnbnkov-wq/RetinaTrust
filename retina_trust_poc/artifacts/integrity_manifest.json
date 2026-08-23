@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "algorithm": "sha256",
+  "description": "Historical integrity record for immutable RetinaTrust v0.1 model/results and the demonstration asset. The current source modules are covered by the v0.3 manifest.",
+  "files": [
+    {
+      "path": "artifacts/retina_baseline.joblib",
+      "size_bytes": 21695,
+      "sha256": "b46b18b6cabad3360c366c9f4cfd79409f2c183dc0a313569396c3ccb696f11e",
+      "role": "Trained baseline artifact"
+    },
+    {
+      "path": "artifacts/locked_test_metrics.json",
+      "size_bytes": 1805,
+      "sha256": "ed45f4b252f8d41070400196387218c1f7d2e5efc674b3182d4d5bc927f2bef4",
+      "role": "Locked-test metrics"
+    },
+    {
+      "path": "artifacts/locked_test_predictions.csv",
+      "size_bytes": 5417,
+      "sha256": "773a5bdeeb2aff56798a7ef18aa49518e131ba9ad64a958a1c751bc475a7f11c",
+      "role": "Locked-test predictions"
+    },
+    {
+      "path": "artifacts/robustness_results.json",
+      "size_bytes": 13400,
+      "sha256": "b0e5178355e57c51faefff13286b0b0a5ef5db61a07026f1b8cb4a100bf83751",
+      "role": "Machine-readable robustness evidence"
+    },
+    {
+      "path": "artifacts/robustness_results.csv",
+      "size_bytes": 4432,
+      "sha256": "0400636fbda4603bfab87ebfd47f830afb2e9e0946ecb048eccea672aae0aa3f",
+      "role": "Tabular robustness evidence"
+    },
+    {
+      "path": "demo/IDRiD_001_demo.jpg",
+      "size_bytes": 152817,
+      "sha256": "69d4a42b5d00a7e0262f7131c3d21403122c2f00d4235af0f28939639145b12d",
+      "role": "Licensed demonstration image"
+    },
+    {
+      "path": "demo/ATTRIBUTION.md",
+      "size_bytes": 497,
+      "sha256": "233e15ce26446862f7af60253e666396b147101e99c6a013fa99e1b27b49d3a7",
+      "role": "Demonstration-image attribution"
+    }
+  ]
+}

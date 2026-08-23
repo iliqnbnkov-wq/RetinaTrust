@@ -1,0 +1,98 @@
+{
+  "n": 103,
+  "threshold": 0.5,
+  "auroc": 0.7323717948717948,
+  "sensitivity": 0.828125,
+  "specificity": 0.38461538461538464,
+  "f1": 0.75177304964539,
+  "macro_f1": 0.6066557555919259,
+  "balanced_accuracy": 0.6063701923076923,
+  "brier": 0.2025920888398031,
+  "nll": 0.5797768998268249,
+  "ece": 0.10518422563252769,
+  "confusion_matrix": [
+    [
+      15,
+      24
+    ],
+    [
+      11,
+      53
+    ]
+  ],
+  "bootstrap_95_ci": {
+    "auroc": [
+      0.6384648187633262,
+      0.8239258526143771
+    ],
+    "macro_f1": [
+      0.5072107844645126,
+      0.7048278363622426
+    ],
+    "balanced_accuracy": [
+      0.5175044555109439,
+      0.6977753708660345
+    ]
+  },
+  "risk_coverage": [
+    {
+      "coverage": 0.0971,
+      "risk": 0.0
+    },
+    {
+      "coverage": 0.2039,
+      "risk": 0.0476
+    },
+    {
+      "coverage": 0.301,
+      "risk": 0.0968
+    },
+    {
+      "coverage": 0.3981,
+      "risk": 0.1707
+    },
+    {
+      "coverage": 0.5049,
+      "risk": 0.1923
+    },
+    {
+      "coverage": 0.6019,
+      "risk": 0.2258
+    },
+    {
+      "coverage": 0.699,
+      "risk": 0.2361
+    },
+    {
+      "coverage": 0.7961,
+      "risk": 0.2927
+    },
+    {
+      "coverage": 0.9029,
+      "risk": 0.3226
+    },
+    {
+      "coverage": 1.0,
+      "risk": 0.3398
+    }
+  ],
+  "model_selection": {
+    "best_C": 1.0,
+    "internal_cv_auroc": 0.8740736145574856,
+    "oof_ece": 0.10154848834512906,
+    "review_policy_from_oof": {
+      "threshold": 0.61,
+      "coverage": 0.7941888619854721,
+      "risk": 0.14634146341463417
+    },
+    "deployed_confidence_floor": 0.85
+  },
+  "data": {
+    "dataset": "IDRiD B. Disease Grading",
+    "train_images": 413,
+    "locked_test_images": 103,
+    "target": "Referable DR (grade >= 2)",
+    "train_positive": 259,
+    "test_positive": 64
+  }
+}

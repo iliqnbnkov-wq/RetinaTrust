@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="RetinaTrust — изследователски прототип за качество и надеждност при анализ на фундус изображения.">
+  <title>RetinaTrust · Research PoC</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="RetinaTrust начало">
+      <span class="brand-mark"><span></span></span>
+      <span><strong>RetinaTrust</strong><small>Quality-aware retinal AI</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="status-dot" role="status" aria-live="polite"><i></i><span id="systemStatus">Зареждане на модела</span></span>
+      <span class="version">RESEARCH PoC · v0.3</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <span class="eyebrow">НАДЕЖДНОСТ ПРЕДИ ПРЕДСКАЗАНИЕ</span>
+        <h1>Качеството на входа е част от решението.</h1>
+        <p>Демонстрационна система за фундус изображения: проверява техническото качество, оценява реферируема диабетна ретинопатия и насочва несигурните случаи към човек.</p>
+      </div>
+      <div class="warning-badge">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Zm0 5.6v5.2m0 3.2v.2"/></svg>
+        <div><strong>Не е медицинско изделие</strong><span>Резултатът не е диагноза и не замества специалист.</span></div>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <aside class="control-panel panel">
+        <div class="panel-head">
+          <div><span class="step">01</span><h2>Входно изображение</h2></div>
+          <span class="mini-badge">JPEG / PNG</span>
+        </div>
+
+        <label class="dropzone" id="dropzone" for="fileInput" tabindex="0" role="button">
+          <input id="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png">
+          <span class="upload-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5"/></svg>
+          </span>
+          <strong id="dropTitle">Пусни фундус изображение тук</strong>
+          <span id="dropMeta">или натисни, за да избереш файл · до 20 MB</span>
+        </label>
+        <button class="secondary-button" id="demoButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 2 2 3-4 2 3"/></svg>
+          Зареди демонстрационно IDRiD изображение
+        </button>
+
+        <div class="divider"></div>
+        <div class="panel-head compact">
+          <div><span class="step">02</span><h2>Стрес тест</h2></div>
+          <span class="info" title="Нарушението се прилага контролирано преди анализа.">i</span>
+        </div>
+        <label class="field-label" for="degradation">Контролирано нарушение</label>
+        <div class="select-wrap">
+          <select id="degradation">
+            <option value="none">Без нарушение</option>
+            <option value="underexposure">Недоекспониране</option>
+            <option value="overexposure">Преекспониране</option>
+            <option value="gamma">Гама отклонение</option>
+            <option value="color_shift">Цветови баланс</option>
+            <option value="blur">Размазване</option>
+            <option value="jpeg">JPEG компресия</option>
+            <option value="combined">Комбинирано нарушение</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <span class="field-label">Тежест</span>
+          <div class="segmented" role="group" aria-label="Тежест на нарушението">
+            <button type="button" data-level="1" class="active" aria-pressed="true">1</button>
+            <button type="button" data-level="2" aria-pressed="false">2</button>
+            <button type="button" data-level="3" aria-pressed="false">3</button>
+          </div>
+        </div>
+
+        <label class="toggle-row">
+          <span><strong>Фотометрична нормализация</strong><small>Демонстрационна корекция преди модела</small></span>
+          <input id="normalization" class="visually-hidden" type="checkbox"><i aria-hidden="true"></i>
+        </label>
+
+        <button id="analyzeButton" class="primary-button" type="button" disabled>
+          <span class="button-label">Анализирай изображението</span>
+          <span class="loader"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+        <p class="control-note">Файлът се обработва локално и не се записва от приложението.</p>
+      </aside>
+
+      <section class="results-panel">
+        <div id="emptyState" class="empty-state panel">
+          <div class="retina-orbit"><i></i><i></i><i></i><span></span></div>
+          <span class="eyebrow">ГОТОВО ЗА АНАЛИЗ</span>
+          <h2>Качи изображение или отвори демонстрационния случай.</h2>
+          <p>Ще видиш отделно качество, вероятност, несигурност и крайното правило за насочване.</p>
+          <div class="flow-line">
+            <span>Вход</span><i></i><span>Quality gate</span><i></i><span>Модел</span><i></i><span>Решение</span>
+          </div>
+        </div>
+
+        <div id="errorState" class="error-state panel hidden" role="alert">
+          <strong>Анализът не завърши</strong><p id="errorMessage"></p>
+        </div>
+
+        <div id="results" class="results hidden" aria-live="polite">
+          <div class="result-header">
+            <div><span class="eyebrow">РЕЗУЛТАТ ОТ АНАЛИЗА</span><h2 id="caseName">Текущ случай</h2></div>
+            <span id="analysisTag" class="mini-badge"></span>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card quality-card">
+              <span class="metric-label">Качество</span>
+              <div class="ring" id="qualityRing"><strong id="qualityScore">—</strong><small>/100</small></div>
+              <span id="qualityGate" class="metric-foot">—</span>
+            </article>
+            <article class="metric-card decision-card">
+              <span class="metric-label">Системно решение</span>
+              <strong id="decisionLabel">—</strong>
+              <p id="decisionReason">—</p>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label" id="probabilityMetricLabel">Вероятност за реферируема DR</span>
+              <strong class="big-number" id="drProbability">—</strong>
+              <div class="probability-track"><i id="probabilityBar"></i><span></span></div>
+              <small id="probabilityNote">Праг за класификация: 50%</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Увереност на модела</span>
+              <strong class="big-number" id="confidenceValue">—</strong>
+              <div class="probability-track confidence"><i id="confidenceBar"></i></div>
+              <small id="confidenceThreshold">Праг за автоматично приемане: —</small>
+            </article>
+          </div>
+
+          <div id="recapturePanel" class="recapture-panel panel hidden" role="status">
+            <div>
+              <span class="eyebrow">РЕШЕНИЕТО Е БЛОКИРАНО</span>
+              <strong>Системата изисква повторно заснемане.</strong>
+              <p>Показаната вероятност остава видима само за анализ на отказа. Тя не се приема като резултат, докато новото изображение не премине quality gate.</p>
+            </div>
+            <div class="recapture-actions">
+              <button id="retakeButton" class="secondary-button inline-button" type="button">Качи повторна снимка</button>
+              <button id="demoRetakeButton" class="primary-button inline-button" type="button">Демо: повтори с чистия вход</button>
+            </div>
+            <small id="demoRetakeNote">Демо бутонът използва първоначалния чист файл като контролирана симулация, не ново клинично заснемане.</small>
+          </div>
+
+          <div id="retakeComparison" class="retake-comparison panel hidden">
+            <div class="panel-head">
+              <div><span class="step">R</span><h2>Преди и след повторното заснемане</h2></div>
+              <span class="mini-badge">paired demo</span>
+            </div>
+            <div class="comparison-grid">
+              <div><span>Преди</span><strong id="beforeQuality">—</strong><small id="beforeDecision">—</small></div>
+              <i aria-hidden="true">→</i>
+              <div><span>След</span><strong id="afterQuality">—</strong><small id="afterDecision">—</small></div>
+            </div>
+            <p id="comparisonConclusion"></p>
+          </div>
+
+          <div class="image-grid">
+            <article class="image-card panel">
+              <div class="image-head"><span>Оригинал</span><small id="originalDimensions">—</small></div>
+              <div class="image-stage"><img id="originalImage" alt="Оригинално фундус изображение"></div>
+            </article>
+            <article class="image-card panel">
+              <div class="image-head"><span>Вход към модела</span><small id="processedLabel">—</small></div>
+              <div class="image-stage"><img id="processedImage" alt="Обработено фундус изображение"></div>
+            </article>
+            <article class="image-card panel">
+              <div class="image-head"><span>Локален контраст</span><small>не е Grad-CAM</small></div>
+              <div class="image-stage"><img id="contrastImage" alt="Карта на локалния контраст"></div>
+            </article>
+          </div>
+
+          <div class="details-grid">
+            <article class="panel quality-details">
+              <div class="panel-head"><div><span class="step">03</span><h2>Фактори на качеството</h2></div></div>
+              <div id="qualityComponents" class="component-list"></div>
+              <div id="qualityIssues" class="issue-box"></div>
+            </article>
+            <article class="panel model-card">
+              <div class="panel-head"><div><span class="step">04</span><h2>Честност на модела</h2></div></div>
+              <p>Резултати върху фиксирания official IDRiD test split (n=103), повторно използван след корекция на протокола. Това е baseline, не клинична валидация.</p>
+              <div class="model-metrics">
+                <div><span>AUROC</span><strong id="metricAuroc">—</strong></div>
+                <div><span>Чувствителност</span><strong id="metricSensitivity">—</strong></div>
+                <div><span>Специфичност</span><strong id="metricSpecificity">—</strong></div>
+                <div><span>ECE</span><strong id="metricEce">—</strong></div>
+              </div>
+              <p id="modelEvidenceNote" class="evidence-note"></p>
+              <div class="chart-wrap">
+                <div class="chart-title"><span>Риск–покритие</span><small>по-ниско е по-добре</small></div>
+                <svg id="riskChart" viewBox="0 0 420 150" role="img" aria-label="Крива риск-покритие"></svg>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel robustness-card">
+            <div class="panel-head">
+              <div><span class="step">05</span><h2>Paired стрес профил върху test split</h2></div>
+              <span class="mini-badge">v0.3 · ниво 3 · n=103</span>
+            </div>
+            <p>Clean и degraded вариантите използват един и същ canonical 1024 px път. Показани са paired разликата в AUROC и 95% bootstrap CI, case-level flip rate и намесата на quality gate. Това остава едноцентров PoC, а не клиничен или универсален причинен ефект.</p>
+            <div class="stress-table-wrap">
+              <table class="stress-table">
+                <thead><tr><th>Условие</th><th>AUROC</th><th>ΔAUROC (95% CI)</th><th>Macro-F1</th><th>Смяна на класа</th><th>Намеса</th></tr></thead>
+                <tbody id="stressTableBody"><tr><td colspan="6">Изчисляване на стрес профила…</td></tr></tbody>
+              </table>
+            </div>
+          </article>
+
+          <details class="technical panel">
+            <summary>Технически подробности и сурови показатели</summary>
+            <pre id="technicalJson"></pre>
+          </details>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <span>RetinaTrust · Academic research prototype</span>
+    <span>IDRiD · CC BY 4.0 · Target: DR grade ≥ 2</span>
+  </footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

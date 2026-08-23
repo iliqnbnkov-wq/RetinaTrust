@@ -1,0 +1,86 @@
+{
+  "purpose": "Quantify the v0.1 confound: legacy direct clean path versus the same images passed through the 1024px resampling path without a named corruption.",
+  "n": 103,
+  "legacy_clean_metrics": {
+    "n": 103,
+    "threshold": 0.5,
+    "auroc": 0.7323717948717948,
+    "sensitivity": 0.828125,
+    "specificity": 0.38461538461538464,
+    "f1": 0.75177304964539,
+    "macro_f1": 0.6066557555919259,
+    "balanced_accuracy": 0.6063701923076923,
+    "brier": 0.2025920888398031,
+    "nll": 0.5797768998268249,
+    "ece": 0.10518422563252769,
+    "confusion_matrix": [
+      [
+        15,
+        24
+      ],
+      [
+        11,
+        53
+      ]
+    ]
+  },
+  "resampling_only_metrics": {
+    "n": 103,
+    "threshold": 0.5,
+    "auroc": 0.7267628205128205,
+    "sensitivity": 0.875,
+    "specificity": 0.3333333333333333,
+    "f1": 0.7671232876712328,
+    "macro_f1": 0.6002283105022831,
+    "balanced_accuracy": 0.6041666666666666,
+    "brier": 0.2065293462713323,
+    "nll": 0.5941397801548344,
+    "ece": 0.10862110298501246,
+    "confusion_matrix": [
+      [
+        13,
+        26
+      ],
+      [
+        8,
+        56
+      ]
+    ]
+  },
+  "paired_comparison": {
+    "delta_auroc": -0.005608974358974339,
+    "delta_macro_f1": -0.006427445089642769,
+    "delta_balanced_accuracy": -0.002203525641025661,
+    "prediction_flip_rate": 0.06796116504854369,
+    "mean_absolute_probability_shift": 0.03006035025617828,
+    "mean_signed_probability_shift": 0.02622792721851743,
+    "paired_bootstrap_95_ci": {
+      "delta_auroc": [
+        -0.029505585515565258,
+        0.01790596412059803
+      ],
+      "delta_macro_f1": [
+        -0.07460544462951522,
+        0.054264607562599106
+      ],
+      "delta_balanced_accuracy": [
+        -0.06280713997927934,
+        0.052888368462138846
+      ],
+      "prediction_flip_rate": [
+        0.028883495145631082,
+        0.11650485436893204
+      ],
+      "mean_absolute_probability_shift": [
+        0.023796402788208083,
+        0.036744710081571125
+      ],
+      "mean_signed_probability_shift": [
+        0.019437647884014427,
+        0.03344467019850352
+      ]
+    },
+    "bootstrap_samples": 2000
+  },
+  "causal_interpretation": false
+}

@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "algorithm": "sha256",
+  "release": "0.4.0",
+  "status": "protocol_ready_external_results_not_run",
+  "description": "Integrity record for the verified v0.3 empirical evidence and the v0.4 frozen DeepDRiD external-validation protocol.",
+  "files": [
+    {
+      "path": "retina_poc/core.py",
+      "size_bytes": 12754,
+      "sha256": "19725898dd13162509dec4f490831e70fbc599acbea7f31b1b6430fd4107393f",
+      "role": "v0.3 evidence — Canonical image, feature and perturbation pipeline"
+    },
+    {
+      "path": "retina_poc/modeling.py",
+      "size_bytes": 9580,
+      "sha256": "34427c0b1f3dd6f3891486f8571d72ff7141f3bcc57f4b09dce895117e230843",
+      "role": "v0.3 evidence — Model inference, metrics and workflow policy"
+    },
+    {
+      "path": "scripts/train_baseline.py",
+      "size_bytes": 11459,
+      "sha256": "fb5cd4a03ccecdd5749bbd66d2c6312ed9b04f10b834b8763d05c5f07b3b5369",
+      "role": "v0.3 evidence — v0.3 training and fixed-split evaluation script"
+    },
+    {
+      "path": "scripts/evaluate_robustness.py",
+      "size_bytes": 15692,
+      "sha256": "66c75a7e8b827ffb755f2e161874128af2aae3acd31ba63c344a9b1d651ce642",
+      "role": "v0.3 evidence — Paired robustness and legacy-control script"
+    },
+    {
+      "path": "artifacts/v0.3/retina_baseline.joblib",
+      "size_bytes": 21945,
+      "sha256": "8731745938510384a4c06a3a0e7738044cb430dec3ef29919e1715b7be4796e7",
+      "role": "v0.3 evidence — Corrected v0.3 trained model"
+    },
+    {
+      "path": "artifacts/v0.3/locked_test_metrics.json",
+      "size_bytes": 2029,
+      "sha256": "bc63f96674cd0c5347288b0f5e356a7f97e1b66268c360ae89a2f148ff54cc38",
+      "role": "v0.3 evidence — Fixed official test-split metrics"
+    },
+    {
+      "path": "artifacts/v0.3/locked_test_predictions.csv",
+      "size_bytes": 5423,
+      "sha256": "dd8cbe9df8f6e18d4510a0e1fcf701acaabd2a571ba657a171231dbeebfd1285",
+      "role": "v0.3 evidence — Fixed official test-split predictions"
+    },
+    {
+      "path": "artifacts/v0.3/robustness_results.json",
+      "size_bytes": 30871,
+      "sha256": "560ac1131e02025494c85b4bc2dfbddcf8b5a3b95565d8846487febb5ddd7d7e",
+      "role": "v0.3 evidence — Machine-readable paired robustness evidence"
+    },
+    {
+      "path": "artifacts/v0.3/robustness_results.csv",
+      "size_bytes": 10206,
+      "sha256": "102e7af66b87a6ad6248734bda9b5f2519a99d73a019d2805775e85fa76a849c",
+      "role": "v0.3 evidence — Tabular paired robustness evidence"
+    },
+    {
+      "path": "artifacts/v0.3/robustness_predictions_long.csv",
+      "size_bytes": 194765,
+      "sha256": "14aea29a61ae13d7e159662bbaa6bd35f1bbd9dadbfc0b22173d1f2a3faab5e2",
+      "role": "v0.3 evidence — Per-image predictions for all robustness conditions"
+    },
+    {
+      "path": "artifacts/v0.3/legacy_resampling_control.json",
+      "size_bytes": 2196,
+      "sha256": "1dcd57cae6db792e4773e568d50bddcb4a98601d103fc2cdb9faf564d7b0a356",
+      "role": "v0.3 evidence — Legacy v0.1 resampling-only analysis"
+    },
+    {
+      "path": "artifacts/v0.3/legacy_resampling_control_predictions.csv",
+      "size_bytes": 8262,
+      "sha256": "2a3515c8d1497702ee166435dff0e522b4f231d005c7aec7ca0c4d25abb43c70",
+      "role": "v0.3 evidence — Per-image legacy resampling-only predictions"
+    },
+    {
+      "path": "docs/DATA_PROVENANCE.md",
+      "size_bytes": 2728,
+      "sha256": "77f33a55785209f15942f95325cda463923a074768038d8bddae88d5dfe7883e",
+      "role": "v0.3 evidence — Dataset retrieval, checksum and license record"
+    },
+    {
+      "path": "demo/IDRiD_001_demo.jpg",
+      "size_bytes": 152817,
+      "sha256": "69d4a42b5d00a7e0262f7131c3d21403122c2f00d4235af0f28939639145b12d",
+      "role": "v0.3 evidence — Licensed demonstration image"
+    },
+    {
+      "path": "demo/ATTRIBUTION.md",
+      "size_bytes": 497,
+      "sha256": "233e15ce26446862f7af60253e666396b147101e99c6a013fa99e1b27b49d3a7",
+      "role": "v0.3 evidence — Demonstration-image attribution"
+    },
+    {
+      "path": "artifacts/v0.3/integrity_manifest.json",
+      "size_bytes": 3685,
+      "sha256": "5ca647d08650f2e7b7d2ba5bd1e6f7f137955fffefe3ed0bd232ef68c4ad6981",
+      "role": "Historical v0.3 integrity record"
+    },
+    {
+      "path": "artifacts/v0.4/external_protocol_lock.json",
+      "size_bytes": 3015,
+      "sha256": "cb578e052b5604410258d072d46f92e22315f528ec99fd68d13b90447abbc52f",
+      "role": "Frozen pre-result external protocol"
+    },
+    {
+      "path": "retina_poc/external_validation.py",
+      "size_bytes": 24195,
+      "sha256": "6183e8000b3aba1ed9fa6254a9aec9c92115c6e927aa8a584dce38b1ac4876e5",
+      "role": "DeepDRiD parser, metrics and clustered evaluation"
+    },
+    {
+      "path": "scripts/evaluate_external.py",
+      "size_bytes": 8047,
+      "sha256": "fa5cf86d850a2ea38aa0f57504da594096b3ae30b84d0dff123b1716c8ac7aee",
+      "role": "Frozen zero-shot external runner"
+    },
+    {
+      "path": "scripts/verify_artifacts.py",
+      "size_bytes": 3556,
+      "sha256": "ca75130887580bc76baf5822c9aeafd73b2098ca634823495f1596608166fb1a",
+      "role": "Integrity-verification command"
+    },
+    {
+      "path": "scripts/build_integrity_manifest.py",
+      "size_bytes": 3984,
+      "sha256": "27dfe258d24f5cdea0509f7beebf1182fbfc6412c4ff8ea190beb834b6279451",
+      "role": "Reproducible v0.4 manifest builder"
+    },
+    {
+      "path": "tests/test_external_validation.py",
+      "size_bytes": 6893,
+      "sha256": "ec3b61068e207772b8bde908ed176915353fffd02830e59a0ac9d873a0fcd507",
+      "role": "External-protocol regression tests"
+    },
+    {
+      "path": "requirements.lock",
+      "size_bytes": 90,
+      "sha256": "3ee37bcb259496f74d766f5d9fe9d57c9cd42510ae9ae3f956aa5b6ff7c4d6d3",
+      "role": "Pinned dependency environment"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "size_bytes": 1267,
+      "sha256": "ca154800532723a8b03a81bbed94f6a8290b08860104209b7c6193d5fa4875e5",
+      "role": "Automated compile, integrity and test workflow"
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 8752,
+      "sha256": "36bfbd29b2f78bb5363e4aad8bd6944f420f4ceddf2f132c8ba333723d2713bd",
+      "role": "Release instructions and scientific status"
+    },
+    {
+      "path": "MODEL_CARD.md",
+      "size_bytes": 5499,
+      "sha256": "e64e8875f319dd09084b77de26ecc1b15643b81c22440404dd444ee048db376f",
+      "role": "Model evidence and external-validation status"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size_bytes": 3529,
+      "sha256": "d9389a0ca18cc039ff4a94b91bb57a50ca7a87561a2841c9a3538b3e996c32a4",
+      "role": "Versioned change record"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "size_bytes": 2811,
+      "sha256": "8601f83ad3465c2ddf7791b8914f0336e998fbf1c2047061e0efb88d4e0138c2",
+      "role": "Scientific change-control policy"
+    },
+    {
+      "path": "START_HERE_BG.md",
+      "size_bytes": 3264,
+      "sha256": "7876577c140687e2c5e906cfdf922ee91b1c9214a3c494e7e9d3968c4444f8a0",
+      "role": "Bulgarian start and presentation guide"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "size_bytes": 1714,
+      "sha256": "4e871fdab1a00d722f1601a311123333a3a45470102f689a956177e7801e6b56",
+      "role": "Dataset and dependency notices"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "size_bytes": 4358,
+      "sha256": "f22f57bbb4dd19aa45917c17a77bf611a8e778343bec4d0e4dc874cbabd8fbe4",
+      "role": "System and external-run boundaries"
+    },
+    {
+      "path": "docs/QA_CHECKLIST.md",
+      "size_bytes": 5101,
+      "sha256": "5b4a6d25de54b803e5ea0e3319f0dab0df053b75589d5e67719cfab911607027",
+      "role": "Release and external-protocol checks"
+    },
+    {
+      "path": "docs/SCIENTIFIC_POSITIONING_BG.md",
+      "size_bytes": 8552,
+      "sha256": "743b85551fec30bb06aa47569f23d67d6bdd414d0c3825054365b421b2446143",
+      "role": "Conservative scientific positioning"
+    },
+    {
+      "path": "docs/DEFENSE_BRIEF_BG.md",
+      "size_bytes": 7833,
+      "sha256": "cf948fd892b2ef4d94a36ad06f49dac97ed778445a9132c4a19c269cebed2a5c",
+      "role": "Bulgarian defense brief"
+    },
+    {
+      "path": "docs/EXTERNAL_VALIDATION_PROTOCOL_BG.md",
+      "size_bytes": 9436,
+      "sha256": "0501066d2259f3b31c062d646653e3ed26516c402495a3274ba609168c7f73e5",
+      "role": "Human-readable frozen protocol"
+    },
+    {
+      "path": "docs/DATA_PROVENANCE_DEEPDRID.md",
+      "size_bytes": 2311,
+      "sha256": "31228320ad876273952eee631a21c84376f63c8a2d069019342d681709544fc2",
+      "role": "External-dataset provenance plan"
+    },
+    {
+      "path": "docs/GEMINI_AUDIT_BG.md",
+      "size_bytes": 3979,
+      "sha256": "899a167346baf251ee747c32decc416e3591468bb68e6e138acf163f6c9e7414",
+      "role": "Source-checked audit of the delegated proposal"
+    }
+  ]
+}

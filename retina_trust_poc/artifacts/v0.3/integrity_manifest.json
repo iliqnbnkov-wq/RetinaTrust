@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "algorithm": "sha256",
+  "description": "Integrity record for the RetinaTrust v0.3 scientific pipeline, model, paired evidence, provenance and demonstration asset.",
+  "files": [
+    {
+      "path": "retina_poc/core.py",
+      "size_bytes": 12754,
+      "sha256": "19725898dd13162509dec4f490831e70fbc599acbea7f31b1b6430fd4107393f",
+      "role": "Canonical image, feature and perturbation pipeline"
+    },
+    {
+      "path": "retina_poc/modeling.py",
+      "size_bytes": 9580,
+      "sha256": "34427c0b1f3dd6f3891486f8571d72ff7141f3bcc57f4b09dce895117e230843",
+      "role": "Model inference, metrics and workflow policy"
+    },
+    {
+      "path": "scripts/train_baseline.py",
+      "size_bytes": 11459,
+      "sha256": "fb5cd4a03ccecdd5749bbd66d2c6312ed9b04f10b834b8763d05c5f07b3b5369",
+      "role": "v0.3 training and fixed-split evaluation script"
+    },
+    {
+      "path": "scripts/evaluate_robustness.py",
+      "size_bytes": 15692,
+      "sha256": "66c75a7e8b827ffb755f2e161874128af2aae3acd31ba63c344a9b1d651ce642",
+      "role": "Paired robustness and legacy-control script"
+    },
+    {
+      "path": "artifacts/v0.3/retina_baseline.joblib",
+      "size_bytes": 21945,
+      "sha256": "8731745938510384a4c06a3a0e7738044cb430dec3ef29919e1715b7be4796e7",
+      "role": "Corrected v0.3 trained model"
+    },
+    {
+      "path": "artifacts/v0.3/locked_test_metrics.json",
+      "size_bytes": 2029,
+      "sha256": "bc63f96674cd0c5347288b0f5e356a7f97e1b66268c360ae89a2f148ff54cc38",
+      "role": "Fixed official test-split metrics"
+    },
+    {
+      "path": "artifacts/v0.3/locked_test_predictions.csv",
+      "size_bytes": 5423,
+      "sha256": "dd8cbe9df8f6e18d4510a0e1fcf701acaabd2a571ba657a171231dbeebfd1285",
+      "role": "Fixed official test-split predictions"
+    },
+    {
+      "path": "artifacts/v0.3/robustness_results.json",
+      "size_bytes": 30871,
+      "sha256": "560ac1131e02025494c85b4bc2dfbddcf8b5a3b95565d8846487febb5ddd7d7e",
+      "role": "Machine-readable paired robustness evidence"
+    },
+    {
+      "path": "artifacts/v0.3/robustness_results.csv",
+      "size_bytes": 10206,
+      "sha256": "102e7af66b87a6ad6248734bda9b5f2519a99d73a019d2805775e85fa76a849c",
+      "role": "Tabular paired robustness evidence"
+    },
+    {
+      "path": "artifacts/v0.3/robustness_predictions_long.csv",
+      "size_bytes": 194765,
+      "sha256": "14aea29a61ae13d7e159662bbaa6bd35f1bbd9dadbfc0b22173d1f2a3faab5e2",
+      "role": "Per-image predictions for all robustness conditions"
+    },
+    {
+      "path": "artifacts/v0.3/legacy_resampling_control.json",
+      "size_bytes": 2196,
+      "sha256": "1dcd57cae6db792e4773e568d50bddcb4a98601d103fc2cdb9faf564d7b0a356",
+      "role": "Legacy v0.1 resampling-only analysis"
+    },
+    {
+      "path": "artifacts/v0.3/legacy_resampling_control_predictions.csv",
+      "size_bytes": 8262,
+      "sha256": "2a3515c8d1497702ee166435dff0e522b4f231d005c7aec7ca0c4d25abb43c70",
+      "role": "Per-image legacy resampling-only predictions"
+    },
+    {
+      "path": "docs/DATA_PROVENANCE.md",
+      "size_bytes": 2728,
+      "sha256": "77f33a55785209f15942f95325cda463923a074768038d8bddae88d5dfe7883e",
+      "role": "Dataset retrieval, checksum and license record"
+    },
+    {
+      "path": "demo/IDRiD_001_demo.jpg",
+      "size_bytes": 152817,
+      "sha256": "69d4a42b5d00a7e0262f7131c3d21403122c2f00d4235af0f28939639145b12d",
+      "role": "Licensed demonstration image"
+    },
+    {
+      "path": "demo/ATTRIBUTION.md",
+      "size_bytes": 497,
+      "sha256": "233e15ce26446862f7af60253e666396b147101e99c6a013fa99e1b27b49d3a7",
+      "role": "Demonstration-image attribution"
+    }
+  ]
+}
