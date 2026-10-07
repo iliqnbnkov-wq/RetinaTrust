@@ -90,9 +90,11 @@ class TestServerIntegration(unittest.TestCase):
         return status, headers, json.loads(raw.decode("utf-8"))
 
     def test_health_endpoint(self) -> None:
-        status, _, raw = self.request("GET", "/health")
+        status, headers, raw = self.request("GET", "/health")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(raw)["status"], "ok")
+        self.assertEqual(headers["X-Frame-Options"], "DENY")
+        self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
 
     def test_status_exposes_model_metrics_and_robustness(self) -> None:
         status, _, raw = self.request("GET", "/api/status")
@@ -101,11 +103,17 @@ class TestServerIntegration(unittest.TestCase):
         self.assertEqual(payload["status"], "ready")
         self.assertEqual(payload["model"]["version"], "0.3.0")
         self.assertEqual(payload["metrics"]["n"], 103)
+        self.assertEqual(
+            payload["presentation"]["technical_confidence_definition"],
+            "max(p, 1 - p)",
+        )
         self.assertIn("underexposure", {row["condition"] for row in payload["robustness"]})
         underexposure = next(
             row for row in payload["robustness"] if row["condition"] == "underexposure"
         )
         self.assertLess(underexposure["delta_auroc_ci"][1], 0.0)
+        clean = next(row for row in payload["robustness"] if row["condition"] == "none")
+        self.assertAlmostEqual(clean["quality_intervention_rate"], 0.252, places=3)
 
     def test_sample_endpoint_returns_jpeg_data_url(self) -> None:
         status, _, raw = self.request("GET", "/api/sample")
@@ -120,6 +128,25 @@ class TestServerIntegration(unittest.TestCase):
         self.assertAlmostEqual(payload["quality"]["score"], 96.7, places=1)
         self.assertEqual(payload["quality"]["gate"], "pass")
         self.assertEqual(payload["decision"]["code"], "provisional_positive")
+        self.assertNotIn("confidence", payload)
+        self.assertNotIn("uncertainty", payload)
+        self.assertAlmostEqual(payload["technical_confidence"]["value"], 0.9521, places=4)
+        self.assertEqual(
+            payload["technical_confidence"]["definition"],
+            "max(p, 1 - p)",
+        )
+        self.assertIn("не е отделна оценка", payload["technical_confidence"]["limitation"])
+        self.assertEqual(payload["thresholds"]["technical_confidence_floor"], 0.85)
+        self.assertNotIn("confidence", payload["thresholds"])
+
+    def test_interface_uses_explicit_non_clinical_semantics(self) -> None:
+        status, _, raw = self.request("GET", "/")
+        html = raw.decode("utf-8")
+        self.assertEqual(status, 200)
+        self.assertIn("Техническа увереност", html)
+        self.assertIn("Експерименталното правило предлага", html)
+        self.assertNotIn("Увереност на модела", html)
+        self.assertNotIn("Системата изисква повторно заснемане", html)
 
     def test_original_demo_bytes_scientific_regression(self) -> None:
         status, _, payload = self.post_json(

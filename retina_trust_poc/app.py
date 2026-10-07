@@ -42,6 +42,13 @@ ARTIFACT = ROOT / "artifacts/v0.3/retina_baseline.joblib"
 DEMO_IMAGE = ROOT / "demo/IDRiD_001_demo.jpg"
 ROBUSTNESS_RESULTS = ROOT / "artifacts/v0.3/robustness_results.json"
 
+TECHNICAL_CONFIDENCE_DEFINITION = "max(p, 1 - p)"
+TECHNICAL_CONFIDENCE_LIMITATION = (
+    "Вероятността на избрания клас не е отделна оценка на епистемична или "
+    "предсказвателна несигурност и не открива надеждно всички входове извън "
+    "обучаващото разпределение."
+)
+
 
 def compact_metrics(bundle: dict) -> dict:
     metrics = bundle["locked_test_metrics"]
@@ -98,6 +105,76 @@ def compact_robustness() -> list[dict]:
     return rows
 
 
+def quality_gate_limitation(rows: list[dict] | None = None) -> str:
+    rows = compact_robustness() if rows is None else rows
+    clean = next((row for row in rows if row["condition"] == "none"), None)
+    if clean is None or clean["quality_intervention_rate"] is None:
+        evidence = "Няма налична clean оценка на честотата на намеса."
+    else:
+        rate = float(clean["quality_intervention_rate"])
+        evidence = f"То се намесва при {rate:.1%} от чистия IDRiD test split."
+    return (
+        "Quality gate е ръчно зададено експериментално правило. "
+        f"{evidence} Няма клинична валидация."
+    )
+
+
+def present_case_result(result: dict) -> dict:
+    """Expose the frozen model output with scientifically explicit semantics.
+
+    The v0.3 model and its scientific code are integrity-locked. This adapter
+    changes only the public presentation contract: it removes the ambiguous
+    scalar names ``confidence`` and ``uncertainty`` and explains exactly what
+    the displayed quantity means.
+    """
+    presented = dict(result)
+    technical_confidence = float(presented.pop("confidence"))
+    presented.pop("uncertainty", None)
+
+    thresholds = dict(presented["thresholds"])
+    confidence_floor = float(thresholds.pop("confidence"))
+    thresholds["technical_confidence_floor"] = confidence_floor
+    presented["thresholds"] = thresholds
+
+    decision = dict(presented["decision"])
+    if decision["code"] == "recapture":
+        decision["reason"] = (
+            "Ръчно зададеният quality gate е отбелязал входа като fail. "
+            "Това е експериментално правило, а не клинична оценка на годността."
+        )
+    elif decision["code"] == "review":
+        decision["reason"] = (
+            "Quality gate е review или max(p, 1 - p) е под фиксирания праг. "
+            "Случаят остава за човешки преглед."
+        )
+    else:
+        predicted_label = (
+            "реферируема DR"
+            if decision["code"] == "provisional_positive"
+            else "нереферируема DR"
+        )
+        decision["label"] = f"Моделен клас: {predicted_label}"
+        decision["reason"] = (
+            "Входът е pass по ръчно зададения quality gate и max(p, 1 - p) е "
+            "над фиксирания праг. Показва се само предварителен моделен изход."
+        )
+    decision["policy_status"] = "experimental_not_clinically_validated"
+    presented["decision"] = decision
+
+    presented["technical_confidence"] = {
+        "value": round(technical_confidence, 4),
+        "definition": TECHNICAL_CONFIDENCE_DEFINITION,
+        "interpretation": "Вероятност, дадена от калибрирания двоичен модел на избрания клас.",
+        "limitation": TECHNICAL_CONFIDENCE_LIMITATION,
+    }
+    presented["limitations"] = [
+        TECHNICAL_CONFIDENCE_LIMITATION,
+        quality_gate_limitation(),
+        "Изходът е изследователски и не е медицинска диагноза.",
+    ]
+    return presented
+
+
 class RetinaHandler(BaseHTTPRequestHandler):
     server_version = "RetinaTrust/0.3"
     bundle: dict = {}
@@ -111,9 +188,20 @@ class RetinaHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _send_security_headers(self) -> None:
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data:; script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+            "object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        )
 
     def _serve_file(self, path: Path) -> None:
         if not path.is_file():
@@ -125,20 +213,26 @@ class RetinaHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(data)
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         if parsed.path == "/api/status":
+            robustness = compact_robustness()
             self._json(
                 {
                     "status": "ready",
                     "model": self.bundle["metadata"],
                     "metrics": compact_metrics(self.bundle),
-                    "robustness": compact_robustness(),
+                    "robustness": robustness,
                     "supported_degradations": sorted(SUPPORTED_DEGRADATIONS),
+                    "presentation": {
+                        "technical_confidence_definition": TECHNICAL_CONFIDENCE_DEFINITION,
+                        "technical_confidence_limitation": TECHNICAL_CONFIDENCE_LIMITATION,
+                        "quality_gate_limitation": quality_gate_limitation(robustness),
+                    },
                 }
             )
             return
@@ -179,7 +273,7 @@ class RetinaHandler(BaseHTTPRequestHandler):
             if request.normalize:
                 processed = normalize_image(processed)
 
-            result = predict_case(processed, self.bundle)
+            result = present_case_result(predict_case(processed, self.bundle))
             result.update(
                 {
                     "preview": image_to_data_url(processed),
@@ -191,7 +285,11 @@ class RetinaHandler(BaseHTTPRequestHandler):
                         "level": request.level,
                         "normalization": request.normalize,
                     },
-                    "disclaimer": "Изследователски прототип. Резултатът не е медицинска диагноза.",
+                    "disclaimer": (
+                        "Изследователски прототип. Изходът не е медицинска диагноза, "
+                        "а quality gate и прагът за техническа увереност не са "
+                        "клинично валидирани."
+                    ),
                 }
             )
             self._json(result)

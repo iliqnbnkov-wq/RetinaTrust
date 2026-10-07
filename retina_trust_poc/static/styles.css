@@ -205,7 +205,7 @@ select:focus { border-color: var(--teal-dark); }
 .decision-card.fail strong { color: var(--red); }
 .decision-card p { color: var(--muted); font-size: 10px; line-height: 1.45; margin: 0; }
 .big-number { display: block; font-size: 30px; margin: 14px 0 10px; letter-spacing: -.04em; }
-.metric-card small { color: var(--muted-2); font-size: 8px; }
+.metric-card small { color: var(--muted-2); display: block; font-size: 8px; line-height: 1.4; }
 .metric-card.blocked { border-color: rgba(255,107,114,.34); }
 .metric-card.blocked .big-number { color: #d5a5a8; text-decoration: line-through; text-decoration-thickness: 1px; }
 .metric-card.blocked .probability-track i { background: linear-gradient(90deg, #7e6065, #b17c83); }
@@ -280,6 +280,15 @@ select:focus { border-color: var(--teal-dark); }
 .technical pre { white-space: pre-wrap; word-break: break-word; color: #9fc2bd; font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; border-top: 1px solid var(--line); padding: 15px 0; max-height: 360px; overflow: auto; }
 .robustness-card { margin-top: 12px; padding: 19px; }
 .robustness-card > p { color: var(--muted); font-size: 10px; margin: -3px 0 15px; max-width: 900px; }
+.robustness-card > .critical-note {
+  max-width: none;
+  margin: 13px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(240,185,91,.24);
+  border-radius: 10px;
+  background: rgba(240,185,91,.055);
+  color: #cfbb98;
+}
 .stress-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
 .stress-table { width: 100%; border-collapse: collapse; min-width: 650px; font-size: 10px; }
 .stress-table th, .stress-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--line); }

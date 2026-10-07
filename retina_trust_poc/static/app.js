@@ -96,7 +96,7 @@ async function loadStatus() {
     const response = await fetch("/api/status", { cache: "no-store" });
     if (!response.ok) throw new Error("Моделът не е достъпен.");
     state.status = await response.json();
-    $("#systemStatus").textContent = "Моделът е готов";
+    $("#systemStatus").textContent = "Прототипът е готов";
     $(".status-dot").classList.add("ready");
     renderModelMetrics(state.status.metrics);
     renderStressTable(state.status.robustness);
@@ -166,30 +166,32 @@ function renderResult(result) {
   $("#qualityScore").textContent = Math.round(qualityScore);
   $("#qualityRing").style.setProperty("--ring", `${qualityScore}%`);
   $("#qualityGate").textContent = {
-    pass: "Технически приемливо",
-    review: "Гранично качество",
-    fail: "Недостатъчно качество",
+    pass: "Експериментален gate: pass",
+    review: "Експериментален gate: review",
+    fail: "Експериментален gate: fail",
   }[result.quality.gate];
 
   const probability = result.probability_referable_dr;
-  const confidence = result.confidence;
+  const confidence = result.technical_confidence.value;
   const blocked = result.decision.code === "recapture";
   const reviewOnly = result.decision.code === "review";
   const probabilityCard = $("#drProbability").closest(".metric-card");
   probabilityCard.classList.toggle("blocked", blocked);
   $("#probabilityMetricLabel").textContent = blocked
-    ? "Вероятност на модела (блокирана)"
+    ? "Моделна вероятност (блокирана)"
     : reviewOnly
-      ? "Вероятност на модела (за преглед)"
-      : "Вероятност за реферируема DR";
+      ? "Моделна вероятност (за преглед)"
+      : "Моделна вероятност за реферируема DR";
   $("#probabilityNote").textContent = blocked
     ? "Само за анализ; не участва в решение."
-    : "Праг за класификация: 50%";
+    : "Фиксиран експериментален праг: 50%";
   $("#drProbability").textContent = percent(probability);
   $("#probabilityBar").style.width = percent(probability);
   $("#confidenceValue").textContent = percent(confidence);
   $("#confidenceBar").style.width = percent(confidence);
-  $("#confidenceThreshold").textContent = `Консервативен праг за приемане: ${percent(result.thresholds.confidence, 0)}`;
+  $("#confidenceThreshold").textContent =
+    `Праг: ${percent(result.thresholds.technical_confidence_floor, 0)} · ` +
+    "max(p, 1−p), не е пълна uncertainty оценка.";
 
   const decisionCard = $(".decision-card");
   decisionCard.classList.remove("pass", "fail");
@@ -209,8 +211,10 @@ function renderResult(result) {
   $("#technicalJson").textContent = JSON.stringify({
     input: result.input,
     raw_quality_metrics: result.raw_quality_metrics,
+    technical_confidence: result.technical_confidence,
     thresholds: result.thresholds,
     model: result.model,
+    limitations: result.limitations,
     disclaimer: result.disclaimer,
   }, null, 2);
 
@@ -259,7 +263,7 @@ function updateRecaptureFlow(result, degradation, normalized) {
   $("#afterQuality").textContent = `${Math.round(result.quality.score)}/100`;
   $("#afterDecision").textContent = `${condition} · ${result.decision.label}`;
   $("#comparisonConclusion").textContent = result.decision.code.startsWith("provisional")
-    ? "Новият вход преминава техническата проверка и едва тогава се допуска предварителен моделен резултат. Това не превръща PoC в диагностична система."
+    ? "Новият вход е pass по експерименталния quality gate и едва тогава се показва предварителен моделен изход. Това не превръща PoC в диагностична система."
     : "Повторното изображение още не позволява автоматичен резултат и остава за човешки преглед.";
   comparison.classList.remove("hidden");
   state.pendingRecapture = null;
@@ -303,9 +307,15 @@ function renderModelMetrics(metrics) {
   const matrix = metrics.confusion_matrix;
   if (ci && matrix) {
     const [[tn, fp], [fn, tp]] = matrix;
+    const cvAuroc = metrics.model_selection?.internal_cv_auroc;
+    const cvGap = Number.isFinite(cvAuroc) ? cvAuroc - Number(metrics.auroc) : null;
+    const cvNote = cvGap == null
+      ? ""
+      : ` · CV AUROC ${Number(cvAuroc).toFixed(3)} → test ${Number(metrics.auroc).toFixed(3)} (разлика ${cvGap.toFixed(3)}).`;
     $("#modelEvidenceNote").textContent =
       `AUROC 95% CI ${Number(ci[0]).toFixed(3)}–${Number(ci[1]).toFixed(3)} · ` +
-      `TN ${tn}, FP ${fp}, FN ${fn}, TP ${tp}. Ниската специфичност не е скрита.`;
+      `TN ${tn}, FP ${fp}, FN ${fn}, TP ${tp}. Ниската специфичност не е скрита.` +
+      cvNote;
   }
   drawRiskCoverage(metrics.risk_coverage);
 }
@@ -391,12 +401,14 @@ function drawRiskCoverage(points) {
 
 function renderStressTable(rows) {
   const body = $("#stressTableBody");
+  const caveat = $("#qualityGateCaveat");
   if (!body) return;
   body.replaceChildren();
   if (!rows || !rows.length) {
     const row = document.createElement("tr");
     row.innerHTML = `<td colspan="6">Стрес профилът още не е изчислен.</td>`;
     body.appendChild(row);
+    if (caveat) caveat.textContent = "Няма налични данни за clean интервенцията на quality gate.";
     return;
   }
   rows.forEach((item) => {
@@ -425,6 +437,12 @@ function renderStressTable(rows) {
     });
     body.appendChild(row);
   });
+  const clean = rows.find((item) => item.condition === "none");
+  if (caveat && clean?.quality_intervention_rate != null) {
+    caveat.textContent =
+      `Важно ограничение: quality gate се намесва при ${percent(clean.quality_intervention_rate, 1)} ` +
+      "от чистия IDRiD test split. Това показва консервативност и възможно свръхнасочване, а не клинична валидност.";
+  }
 }
 
 function bindEvents() {
