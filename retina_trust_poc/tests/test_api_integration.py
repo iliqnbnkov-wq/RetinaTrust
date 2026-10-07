@@ -153,7 +153,14 @@ class TestServerIntegration(unittest.TestCase):
             self.analyze_payload(image_data_url=self.original_data_url)
         )
         self.assertEqual(status, 200)
-        self.assertAlmostEqual(payload["probability_referable_dr"], 0.9450, places=4)
+        # Native JPEG decoders can differ by one least-significant feature step
+        # across operating systems. Keep the regression narrow while allowing
+        # the observed Windows/Linux probability variation.
+        self.assertAlmostEqual(
+            payload["probability_referable_dr"],
+            0.9450,
+            delta=0.0002,
+        )
         self.assertAlmostEqual(payload["quality"]["score"], 97.0, places=1)
 
     def test_severe_combined_input_is_blocked_for_recapture(self) -> None:
