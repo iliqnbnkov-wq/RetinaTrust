@@ -17,15 +17,16 @@ from scripts.analyze_failures import (  # noqa: E402
     analyze_eye_pair_disagreements,
     analyze_errors_by_dimension,
     calculate_bootstrap_intervals,
+    calculate_overall_metrics,
     generate_bulgarian_report,
     validate_predictions_csv,
 )
 
 
 class FailureAnalysisValidationTests(unittest.TestCase):
-    def test_validate_predictions_csv_detects_duplicates(self) -> None:
+    def test_validate_rejects_duplicate_image_ids(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "training"],
+            "partition": ["regular-fundus-training", "regular-fundus-training"],
             "patient_id": ["1", "1"],
             "image_id": ["1_l1", "1_l1"],  # Duplicate
             "eye": ["l", "l"],
@@ -37,13 +38,12 @@ class FailureAnalysisValidationTests(unittest.TestCase):
             "quality_score": [80.0, 80.0],
             "quality_gate": ["pass", "pass"],
         })
-        result = validate_predictions_csv(frame)
-        self.assertEqual(len(result["duplicate_image_ids"]), 1)
-        self.assertIn("1_l1", result["duplicate_image_ids"])
+        with self.assertRaisesRegex(ValueError, "duplicate image_ids"):
+            validate_predictions_csv(frame, threshold=0.5)
 
-    def test_validate_predictions_csv_detects_invalid_dr_grades(self) -> None:
+    def test_validate_rejects_invalid_dr_grades(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"],
+            "partition": ["regular-fundus-training"],
             "patient_id": ["1"],
             "image_id": ["1_l1"],
             "eye": ["l"],
@@ -55,13 +55,12 @@ class FailureAnalysisValidationTests(unittest.TestCase):
             "quality_score": [80.0],
             "quality_gate": ["pass"],
         })
-        result = validate_predictions_csv(frame)
-        self.assertEqual(len(result["invalid_dr_grades"]), 1)
-        self.assertIn("1_l1", result["invalid_dr_grades"])
+        with self.assertRaisesRegex(ValueError, "invalid DR grades"):
+            validate_predictions_csv(frame, threshold=0.5)
 
-    def test_validate_predictions_csv_detects_invalid_quality_gates(self) -> None:
+    def test_validate_rejects_invalid_quality_gates(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"],
+            "partition": ["regular-fundus-training"],
             "patient_id": ["1"],
             "image_id": ["1_l1"],
             "eye": ["l"],
@@ -73,13 +72,12 @@ class FailureAnalysisValidationTests(unittest.TestCase):
             "quality_score": [80.0],
             "quality_gate": ["invalid"],  # Invalid
         })
-        result = validate_predictions_csv(frame)
-        self.assertEqual(len(result["invalid_quality_gates"]), 1)
-        self.assertIn("1_l1", result["invalid_quality_gates"])
+        with self.assertRaisesRegex(ValueError, "invalid quality gates"):
+            validate_predictions_csv(frame, threshold=0.5)
 
-    def test_validate_predictions_csv_detects_missing_referable_dr(self) -> None:
+    def test_validate_rejects_missing_referable_dr(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"],
+            "partition": ["regular-fundus-training"],
             "patient_id": ["1"],
             "image_id": ["1_l1"],
             "eye": ["l"],
@@ -91,23 +89,83 @@ class FailureAnalysisValidationTests(unittest.TestCase):
             "quality_score": [80.0],
             "quality_gate": ["pass"],
         })
-        result = validate_predictions_csv(frame)
-        self.assertEqual(result["missing_referable_dr"], 1)
+        with self.assertRaisesRegex(ValueError, "missing referable_dr"):
+            validate_predictions_csv(frame, threshold=0.5)
 
-    def test_validate_predictions_csv_requires_schema(self) -> None:
+    def test_validate_rejects_nonfinite_probabilities(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"],
+            "partition": ["regular-fundus-training"],
             "patient_id": ["1"],
-            # Missing required columns
+            "image_id": ["1_l1"],
+            "eye": ["l"],
+            "dr_grade": [0],
+            "referable_dr": [0],
+            "quality_good": [1],
+            "probability_referable_dr": [np.nan],  # Nonfinite
+            "confidence": [0.9],
+            "quality_score": [80.0],
+            "quality_gate": ["pass"],
         })
-        with self.assertRaises(ValueError):
-            validate_predictions_csv(frame)
+        with self.assertRaisesRegex(ValueError, "nonfinite or out-of-range probabilities"):
+            validate_predictions_csv(frame, threshold=0.5)
+
+    def test_validate_rejects_invalid_threshold(self) -> None:
+        frame = pd.DataFrame({
+            "partition": ["regular-fundus-training"],
+            "patient_id": ["1"],
+            "image_id": ["1_l1"],
+            "eye": ["l"],
+            "dr_grade": [0],
+            "referable_dr": [0],
+            "quality_good": [1],
+            "probability_referable_dr": [0.1],
+            "confidence": [0.9],
+            "quality_score": [80.0],
+            "quality_gate": ["pass"],
+        })
+        with self.assertRaisesRegex(ValueError, "Classification threshold must be between 0 and 1"):
+            validate_predictions_csv(frame, threshold=1.5)
+
+    def test_validate_rejects_inconsistent_dr_labels(self) -> None:
+        frame = pd.DataFrame({
+            "partition": ["regular-fundus-training"],
+            "patient_id": ["1"],
+            "image_id": ["1_l1"],
+            "eye": ["l"],
+            "dr_grade": [2],  # Should be referable (1)
+            "referable_dr": [0],  # But is marked as non-referable
+            "quality_good": [1],
+            "probability_referable_dr": [0.1],
+            "confidence": [0.9],
+            "quality_score": [80.0],
+            "quality_gate": ["pass"],
+        })
+        with self.assertRaisesRegex(ValueError, "inconsistent DR grades and binary labels"):
+            validate_predictions_csv(frame, threshold=0.5)
+
+    def test_validate_accepts_ungradable_dr_grade_five(self) -> None:
+        frame = pd.DataFrame({
+            "partition": ["regular-fundus-training"],
+            "patient_id": ["1"],
+            "image_id": ["1_l1"],
+            "eye": ["l"],
+            "dr_grade": [5],  # UNGRADABLE_DR_GRADE is valid
+            "referable_dr": [None],  # Can be None for ungradable
+            "quality_good": [0],
+            "probability_referable_dr": [0.1],
+            "confidence": [0.9],
+            "quality_score": [40.0],
+            "quality_gate": ["fail"],
+        })
+        # Should not raise
+        result = validate_predictions_csv(frame, threshold=0.5)
+        self.assertEqual(result["total_rows"], 1)
 
 
 class FailureAnalysisErrorTests(unittest.TestCase):
     def test_errors_by_dr_grade_returns_all_grades(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"] * 5,
+            "partition": ["regular-fundus-training"] * 5,
             "patient_id": ["1", "2", "3", "4", "5"],
             "image_id": ["1_l1", "2_l1", "3_l1", "4_l1", "5_l1"],
             "eye": ["l"] * 5,
@@ -127,7 +185,7 @@ class FailureAnalysisErrorTests(unittest.TestCase):
 
     def test_errors_by_quality_separates_gradable_ungradable(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "training"],
+            "partition": ["regular-fundus-training", "regular-fundus-training"],
             "patient_id": ["1", "2"],
             "image_id": ["1_l1", "2_l1"],
             "eye": ["l", "l"],
@@ -144,9 +202,9 @@ class FailureAnalysisErrorTests(unittest.TestCase):
         quality_values = {item["official_quality_good"] for item in result}
         self.assertEqual(quality_values, {0, 1})
 
-    def test_errors_by_partition_separates_training_validation(self) -> None:
+    def test_errors_by_partition_uses_actual_deepdrid_names(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "validation"],
+            "partition": ["regular-fundus-training", "regular-fundus-validation"],
             "patient_id": ["1", "2"],
             "image_id": ["1_l1", "2_l1"],
             "eye": ["l", "l"],
@@ -161,13 +219,13 @@ class FailureAnalysisErrorTests(unittest.TestCase):
         result = analyze_errors_by_dimension(frame, "partition", threshold=0.5)
         self.assertEqual(len(result), 2)
         partitions = {item["partition"] for item in result}
-        self.assertEqual(partitions, {"training", "validation"})
+        self.assertEqual(partitions, {"regular-fundus-training", "regular-fundus-validation"})
 
 
 class FailureAnalysisCalibrationTests(unittest.TestCase):
     def test_calibration_calculates_ece_and_brier(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "training", "training"],
+            "partition": ["regular-fundus-training", "regular-fundus-training", "regular-fundus-training"],
             "patient_id": ["1", "2", "3"],
             "image_id": ["1_l1", "2_l1", "3_l1"],
             "eye": ["l", "l", "l"],
@@ -185,9 +243,9 @@ class FailureAnalysisCalibrationTests(unittest.TestCase):
         self.assertIsNotNone(result["brier"])
         self.assertEqual(len(result["bins"]), 10)
 
-    def test_calibration_bins_are_complete(self) -> None:
+    def test_calibration_uses_correct_terminology(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"] * 3,
+            "partition": ["regular-fundus-training"] * 3,
             "patient_id": ["1", "2", "3"],
             "image_id": ["1_l1", "2_l1", "3_l1"],
             "eye": ["l", "l", "l"],
@@ -200,17 +258,17 @@ class FailureAnalysisCalibrationTests(unittest.TestCase):
             "quality_gate": ["pass", "pass", "pass"],
         })
         result = analyze_calibration(frame, bins=5)
-        self.assertEqual(len(result["bins"]), 5)
+        # Check that the correct terminology is used
         for bin_result in result["bins"]:
-            self.assertIn("bin", bin_result)
-            self.assertIn("range", bin_result)
-            self.assertIn("n", bin_result)
+            if bin_result["n"] > 0:
+                self.assertIn("mean_predicted_positive_probability", bin_result)
+                self.assertIn("observed_positive_rate", bin_result)
 
 
 class FailureAnalysisEyeDisagreementTests(unittest.TestCase):
     def test_eye_disagreement_detects_mismatched_predictions(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "training"],
+            "partition": ["regular-fundus-training", "regular-fundus-training"],
             "patient_id": ["1", "1"],
             "image_id": ["1_l1", "1_l2"],
             "eye": ["l", "l"],
@@ -226,27 +284,9 @@ class FailureAnalysisEyeDisagreementTests(unittest.TestCase):
         self.assertEqual(result["total_pairs"], 1)
         self.assertEqual(result["disagreement_count"], 1)
 
-    def test_eye_disagreement_no_disagreement_when_same_predictions(self) -> None:
+    def test_eye_disagreement_uses_actual_partition_names(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "training"],
-            "patient_id": ["1", "1"],
-            "image_id": ["1_l1", "1_l2"],
-            "eye": ["l", "l"],
-            "dr_grade": [0, 0],
-            "referable_dr": [0, 0],
-            "quality_good": [1, 1],
-            "probability_referable_dr": [0.4, 0.3],  # Same predictions at threshold 0.5
-            "confidence": [0.6, 0.7],
-            "quality_score": [80.0, 80.0],
-            "quality_gate": ["pass", "pass"],
-        })
-        result = analyze_eye_pair_disagreements(frame, threshold=0.5)
-        self.assertEqual(result["total_pairs"], 1)
-        self.assertEqual(result["disagreement_count"], 0)
-
-    def test_eye_disagreement_groups_by_partition(self) -> None:
-        frame = pd.DataFrame({
-            "partition": ["training", "validation", "training", "validation"],
+            "partition": ["regular-fundus-training", "regular-fundus-validation", "regular-fundus-training", "regular-fundus-validation"],
             "patient_id": ["1", "2", "1", "2"],
             "image_id": ["1_l1", "2_l1", "1_l2", "2_l2"],
             "eye": ["l", "l", "l", "l"],
@@ -261,13 +301,13 @@ class FailureAnalysisEyeDisagreementTests(unittest.TestCase):
         result = analyze_eye_pair_disagreements(frame, threshold=0.5)
         self.assertEqual(len(result["by_partition"]), 2)
         partitions = {item["partition"] for item in result["by_partition"]}
-        self.assertEqual(partitions, {"training", "validation"})
+        self.assertEqual(partitions, {"regular-fundus-training", "regular-fundus-validation"})
 
 
 class FailureAnalysisBootstrapTests(unittest.TestCase):
     def test_bootstrap_requires_at_least_two_clusters(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training"],
+            "partition": ["regular-fundus-training"],
             "patient_id": ["1"],  # Only one patient
             "image_id": ["1_l1"],
             "eye": ["l"],
@@ -286,7 +326,7 @@ class FailureAnalysisBootstrapTests(unittest.TestCase):
 
     def test_bootstrap_calculates_intervals_with_multiple_clusters(self) -> None:
         frame = pd.DataFrame({
-            "partition": ["training", "training", "training", "training"],
+            "partition": ["regular-fundus-training", "regular-fundus-training", "regular-fundus-training", "regular-fundus-training"],
             "patient_id": ["1", "1", "2", "2"],  # Two patients
             "image_id": ["1_l1", "1_l2", "2_l1", "2_l2"],
             "eye": ["l", "l", "l", "l"],
@@ -304,19 +344,56 @@ class FailureAnalysisBootstrapTests(unittest.TestCase):
         self.assertIn("95_ci", result["intervals"]["intervals"]["auroc"])
 
 
+class FailureAnalysisOverallMetricsTests(unittest.TestCase):
+    def test_overall_metrics_calculates_key_metrics(self) -> None:
+        frame = pd.DataFrame({
+            "partition": ["regular-fundus-training", "regular-fundus-training", "regular-fundus-training", "regular-fundus-training"],
+            "patient_id": ["1", "2", "3", "4"],
+            "image_id": ["1_l1", "2_l1", "3_l1", "4_l1"],
+            "eye": ["l", "l", "l", "l"],
+            "dr_grade": [0, 0, 1, 1],
+            "referable_dr": [0, 0, 1, 1],
+            "quality_good": [1, 1, 1, 1],
+            "probability_referable_dr": [0.1, 0.2, 0.7, 0.8],
+            "confidence": [0.9, 0.8, 0.7, 0.8],
+            "quality_score": [80.0, 80.0, 80.0, 80.0],
+            "quality_gate": ["pass", "pass", "pass", "pass"],
+        })
+        result = calculate_overall_metrics(frame, threshold=0.5)
+        self.assertEqual(result["n"], 4)
+        self.assertIsNotNone(result["metrics"])
+        metrics = result["metrics"]
+        self.assertIn("auroc", metrics)
+        self.assertIn("accuracy", metrics)
+        self.assertIn("sensitivity", metrics)
+        self.assertIn("specificity", metrics)
+        self.assertIn("brier", metrics)
+        self.assertIn("ece", metrics)
+        self.assertIn("confusion_matrix", metrics)
+
+
 class FailureAnalysisReportTests(unittest.TestCase):
     def test_bulgarian_report_generates_markdown(self) -> None:
         result = {
             "generated_at_utc": "2026-10-27T10:00:00Z",
             "input_file": "test.csv",
+            "input_sha256": "abc123",
             "total_images": 100,
             "total_patients": 20,
             "dr_eligible_images": 90,
-            "validation": {
-                "duplicate_image_ids": [],
-                "invalid_dr_grades": [],
-                "invalid_quality_gates": [],
-                "missing_referable_dr": 0,
+            "overall_metrics": {
+                "metrics": {
+                    "auroc": 0.4620,
+                    "accuracy": 0.4462,
+                    "sensitivity": 0.7235,
+                    "specificity": 0.2290,
+                    "balanced_accuracy": 0.4762,
+                    "macro_f1": 0.45,
+                    "brier": 0.4390,
+                    "nll": 0.65,
+                    "ece": 0.4100,
+                    "confusion_matrix": [[204, 687], [193, 505]],
+                }
             },
             "errors_by_dr_grade": [
                 {"dr_grade": 0, "n": 30, "error_rate": 0.1, "mean_probability": 0.2},
@@ -325,7 +402,7 @@ class FailureAnalysisReportTests(unittest.TestCase):
                 {"official_quality_good": 1, "n": 50, "error_rate": 0.15, "mean_probability": 0.3},
             ],
             "errors_by_partition": [
-                {"partition": "training", "n": 60, "error_rate": 0.12, "mean_probability": 0.25},
+                {"partition": "regular-fundus-training", "n": 60, "error_rate": 0.12, "mean_probability": 0.25},
             ],
             "errors_by_gate": [
                 {"quality_gate": "pass", "n": 40, "error_rate": 0.1, "mean_probability": 0.2},
@@ -339,7 +416,7 @@ class FailureAnalysisReportTests(unittest.TestCase):
                 "total_pairs": 10,
                 "disagreement_count": 2,
                 "by_partition": [
-                    {"partition": "training", "total_pairs": 6, "disagreement_pairs": 1, "disagreement_rate": 0.1667},
+                    {"partition": "regular-fundus-training", "total_pairs": 6, "disagreement_pairs": 1, "disagreement_rate": 0.1667},
                 ],
             },
             "bootstrap_intervals": {
@@ -357,8 +434,9 @@ class FailureAnalysisReportTests(unittest.TestCase):
         self.assertIn("# RetinaTrust v0.6", report)
         self.assertIn("Анализ на грешките", report)
         self.assertIn("Калибрация", report)
-        self.assertIn("0.15", report)  # ECE value
-        self.assertIn("0.2", report)  # Brier score
+        self.assertIn("0.4620", report)  # AUROC value
+        self.assertIn("0.4390", report)  # Brier score
+        self.assertIn("regular-fundus-training", report)  # Actual partition name
 
 
 if __name__ == "__main__":

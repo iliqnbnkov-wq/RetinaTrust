@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -37,6 +38,12 @@ DEFAULT_OUTPUT = PROJECT_ROOT / "outputs/failure_analysis"
 DEFAULT_BOOTSTRAP_SAMPLES = 2000
 DEFAULT_BOOTSTRAP_SEED = 20260823
 DEFAULT_CLASSIFICATION_THRESHOLD = 0.5
+
+# Actual DeepDRiD partition names from the predictions CSV
+DEEPDRID_PARTITIONS = {
+    "regular-fundus-training": "training",
+    "regular-fundus-validation": "validation",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -76,17 +83,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def validate_predictions_csv(frame: pd.DataFrame) -> dict[str, Any]:
-    """Validate predictions CSV for duplicates, invalid labels, and schema."""
-    validation_result = {
-        "schema_valid": True,
-        "duplicate_image_ids": [],
-        "invalid_dr_grades": [],
-        "invalid_quality_gates": [],
-        "missing_referable_dr": 0,
-        "total_rows": len(frame),
-    }
+def sha256_file(path: str | Path) -> str:
+    """Calculate SHA-256 hash of a file."""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
+
+def validate_predictions_csv(frame: pd.DataFrame, threshold: float) -> dict[str, Any]:
+    """
+    Validate predictions CSV for duplicates, invalid labels, and schema.
+    Raises ValueError with actionable error messages for critical issues.
+    """
     required_columns = {
         "partition",
         "patient_id",
@@ -104,24 +114,92 @@ def validate_predictions_csv(frame: pd.DataFrame) -> dict[str, Any]:
     if missing:
         raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
 
+    validation_result = {
+        "schema_valid": True,
+        "duplicate_image_ids": [],
+        "invalid_dr_grades": [],
+        "invalid_quality_gates": [],
+        "missing_referable_dr": 0,
+        "nonfinite_probabilities": [],
+        "nonfinite_confidence": [],
+        "invalid_threshold": False,
+        "inconsistent_dr_labels": [],
+        "total_rows": len(frame),
+    }
+
     # Check for duplicate image_ids
     image_id_counts = frame["image_id"].value_counts()
     duplicates = image_id_counts[image_id_counts > 1].index.tolist()
     validation_result["duplicate_image_ids"] = duplicates
+    if duplicates:
+        raise ValueError(
+            f"Found {len(duplicates)} duplicate image_ids: {duplicates[:5]}{'...' if len(duplicates) > 5 else ''}. "
+            "Each image must have a unique identifier."
+        )
 
-    # Check for invalid DR grades
+    # Check for invalid DR grades (allow 0-5, where 5 is UNGRADABLE_DR_GRADE)
     valid_grades = set(range(6))
     invalid_grades = frame[~frame["dr_grade"].isin(valid_grades)]["image_id"].tolist()
     validation_result["invalid_dr_grades"] = invalid_grades
+    if invalid_grades:
+        raise ValueError(
+            f"Found {len(invalid_grades)} records with invalid DR grades (must be 0-5): "
+            f"{invalid_grades[:5]}{'...' if len(invalid_grades) > 5 else ''}"
+        )
 
     # Check for invalid quality gates
     valid_gates = {"pass", "review", "fail"}
     invalid_gates = frame[~frame["quality_gate"].isin(valid_gates)]["image_id"].tolist()
     validation_result["invalid_quality_gates"] = invalid_gates
+    if invalid_gates:
+        raise ValueError(
+            f"Found {len(invalid_gates)} records with invalid quality gates (must be pass/review/fail): "
+            f"{invalid_gates[:5]}{'...' if len(invalid_gates) > 5 else ''}"
+        )
 
     # Check for missing referable_dr when dr_grade is not UNGRADABLE
     eligible = frame[frame["dr_grade"] != UNGRADABLE_DR_GRADE]
-    validation_result["missing_referable_dr"] = int(eligible["referable_dr"].isna().sum())
+    missing_count = int(eligible["referable_dr"].isna().sum())
+    validation_result["missing_referable_dr"] = missing_count
+    if missing_count > 0:
+        raise ValueError(
+            f"Found {missing_count} DR-eligible records with missing referable_dr label. "
+            "All non-ungradable records must have a binary diagnostic label."
+        )
+
+    # Check for nonfinite or out-of-range probabilities
+    nonfinite_probs = frame[~frame["probability_referable_dr"].apply(lambda x: np.isfinite(x) and 0 <= x <= 1)]["image_id"].tolist()
+    validation_result["nonfinite_probabilities"] = nonfinite_probs
+    if nonfinite_probs:
+        raise ValueError(
+            f"Found {len(nonfinite_probs)} records with nonfinite or out-of-range probabilities (must be 0-1): "
+            f"{nonfinite_probs[:5]}{'...' if len(nonfinite_probs) > 5 else ''}"
+        )
+
+    # Check for nonfinite or out-of-range confidence
+    nonfinite_conf = frame[~frame["confidence"].apply(lambda x: np.isfinite(x) and 0 <= x <= 1)]["image_id"].tolist()
+    validation_result["nonfinite_confidence"] = nonfinite_conf
+    if nonfinite_conf:
+        raise ValueError(
+            f"Found {len(nonfinite_conf)} records with nonfinite or out-of-range confidence (must be 0-1): "
+            f"{nonfinite_conf[:5]}{'...' if len(nonfinite_conf) > 5 else ''}"
+        )
+
+    # Check classification threshold
+    if not (0 <= threshold <= 1):
+        validation_result["invalid_threshold"] = True
+        raise ValueError(f"Classification threshold must be between 0 and 1, got {threshold}")
+
+    # Check for inconsistent DR grades and binary labels
+    eligible["expected_referable"] = (eligible["dr_grade"] >= 2).astype(int)
+    inconsistent = eligible[eligible["referable_dr"] != eligible["expected_referable"]]["image_id"].tolist()
+    validation_result["inconsistent_dr_labels"] = inconsistent
+    if inconsistent:
+        raise ValueError(
+            f"Found {len(inconsistent)} records with inconsistent DR grades and binary labels "
+            f"(dr_grade >= 2 should match referable_dr = 1): "
+            f"{inconsistent[:5]}{'...' if len(inconsistent) > 5 else ''}"
+        )
 
     return validation_result
 
@@ -183,7 +261,8 @@ def analyze_errors_by_dimension(
             })
 
     elif dimension == "partition":
-        for partition in ["training", "validation"]:
+        # Use actual DeepDRiD partition names
+        for partition in DEEPDRID_PARTITIONS.keys():
             subset = dr_eligible[dr_eligible["partition"] == partition]
             if subset.empty:
                 continue
@@ -236,7 +315,11 @@ def analyze_errors_by_dimension(
 
 
 def analyze_calibration(frame: pd.DataFrame, bins: int = 10) -> dict[str, Any]:
-    """Analyze calibration using ECE, Brier score, and reliability bins."""
+    """
+    Analyze calibration using ECE, Brier score, and reliability bins.
+    For positive-class probability reliability, uses mean_predicted_positive_probability
+    and observed_positive_rate (not classification accuracy).
+    """
     dr_eligible = frame[frame["dr_grade"] != UNGRADABLE_DR_GRADE].copy()
     if dr_eligible.empty:
         return {"n": 0, "ece": None, "brier": None, "bins": []}
@@ -248,7 +331,7 @@ def analyze_calibration(frame: pd.DataFrame, bins: int = 10) -> dict[str, Any]:
     ece = expected_calibration_error(y, probability, bins=bins)
     brier = float(np.mean((probability - y) ** 2))
 
-    # Calculate reliability bins
+    # Calculate reliability bins for positive-class probability
     edges = np.linspace(0.0, 1.0, bins + 1)
     bin_results = []
     for i, (low, high) in enumerate(zip(edges[:-1], edges[1:])):
@@ -262,24 +345,24 @@ def analyze_calibration(frame: pd.DataFrame, bins: int = 10) -> dict[str, Any]:
                 "bin": i,
                 "range": [float(low), float(high)],
                 "n": 0,
-                "mean_confidence": None,
-                "accuracy": None,
+                "mean_predicted_positive_probability": None,
+                "observed_positive_rate": None,
                 "ece_contribution": 0.0,
             })
             continue
 
         bin_y = y[include]
         bin_prob = probability[include]
-        accuracy = float(bin_y.mean())
-        mean_confidence = float(bin_prob.mean())
-        ece_contrib = float(include.mean() * abs(accuracy - mean_confidence))
+        observed_positive_rate = float(bin_y.mean())
+        mean_predicted_positive_probability = float(bin_prob.mean())
+        ece_contrib = float(include.mean() * abs(observed_positive_rate - mean_predicted_positive_probability))
 
         bin_results.append({
             "bin": i,
             "range": [float(low), float(high)],
             "n": int(include.sum()),
-            "mean_confidence": mean_confidence,
-            "accuracy": accuracy,
+            "mean_predicted_positive_probability": mean_predicted_positive_probability,
+            "observed_positive_rate": observed_positive_rate,
             "ece_contribution": ece_contrib,
         })
 
@@ -320,9 +403,9 @@ def analyze_eye_pair_disagreements(frame: pd.DataFrame, threshold: float) -> dic
     total_pairs = len(pairs)
     disagreements = [p for p in pairs if p["has_disagreement"]]
 
-    # Summarize disagreements by partition
+    # Summarize disagreements by partition (use actual DeepDRiD partition names)
     disagreement_summary = []
-    for partition in ["training", "validation"]:
+    for partition in DEEPDRID_PARTITIONS.keys():
         partition_pairs = [p for p in pairs if p["partition"] == partition]
         partition_disagreements = [p for p in partition_pairs if p["has_disagreement"]]
         if partition_pairs:
@@ -381,6 +464,23 @@ def calculate_bootstrap_intervals(
     }
 
 
+def calculate_overall_metrics(frame: pd.DataFrame, threshold: float) -> dict[str, Any]:
+    """Calculate overall point estimates for key scientific metrics."""
+    dr_eligible = frame[frame["dr_grade"] != UNGRADABLE_DR_GRADE].copy()
+    if dr_eligible.empty:
+        return {"n": 0, "metrics": None}
+
+    y = dr_eligible["referable_dr"].astype(int).to_numpy()
+    probability = dr_eligible["probability_referable_dr"].astype(float).to_numpy()
+
+    metrics = binary_probability_metrics(y, probability, threshold=threshold)
+
+    return {
+        "n": int(len(dr_eligible)),
+        "metrics": metrics,
+    }
+
+
 def generate_bulgarian_report(result: dict[str, Any]) -> str:
     """Generate a scientifically readable report in Bulgarian."""
     lines = [
@@ -388,20 +488,42 @@ def generate_bulgarian_report(result: dict[str, Any]) -> str:
         "",
         f"**Дата на генериране:** {result.get('generated_at_utc', 'N/A')}",
         f"**Входен файл:** {result.get('input_file', 'N/A')}",
+        f"**SHA-256 на входния файл:** {result.get('input_sha256', 'N/A')}",
         f"**Общо изображения:** {result.get('total_images', 0)}",
         f"**Общо пациенти:** {result.get('total_patients', 0)}",
         f"**DR-допустими изображения:** {result.get('dr_eligible_images', 0)}",
         "",
-        "## Валидация на данните",
+        "## Научна декларация",
         "",
-        f"- Дублирани image_ids: {len(result.get('validation', {}).get('duplicate_image_ids', []))}",
-        f"- Невалидни DR степени: {len(result.get('validation', {}).get('invalid_dr_grades', []))}",
-        f"- Невалидни quality gates: {len(result.get('validation', {}).get('invalid_quality_gates', []))}",
-        f"- Липсващи referable_dr: {result.get('validation', {}).get('missing_referable_dr', 0)}",
+        "- Този анализ е изследователски proof-of-concept и не е медицинско изделие.",
+        "- Моделът и праговете са замразени (RetinaTrust v0.3), без обучение върху DeepDRiD.",
+        "- Резултатите са post-hoc изследователски анализ, не първоначален протокол.",
+        "- Не се правят клинични заключения за безопасност или ефективност.",
         "",
-        "## Анализ на грешките по DR степен",
+        "## Общи метрики (point estimates)",
         "",
     ]
+
+    overall = result.get("overall_metrics", {}).get("metrics", {})
+    if overall:
+        lines.extend([
+            f"- AUROC: {overall.get('auroc', 'N/A'):.4f}",
+            f"- Accuracy: {overall.get('accuracy', 'N/A'):.4f}",
+            f"- Sensitivity: {overall.get('sensitivity', 'N/A'):.4f}",
+            f"- Specificity: {overall.get('specificity', 'N/A'):.4f}",
+            f"- Balanced accuracy: {overall.get('balanced_accuracy', 'N/A'):.4f}",
+            f"- Macro F1: {overall.get('macro_f1', 'N/A'):.4f}",
+            f"- Brier score: {overall.get('brier', 'N/A'):.4f}",
+            f"- NLL: {overall.get('nll', 'N/A'):.4f}",
+            f"- ECE: {overall.get('ece', 'N/A'):.4f}",
+            f"- Confusion matrix: {overall.get('confusion_matrix', 'N/A')}",
+            "",
+        ])
+
+    lines.extend([
+        "## Анализ на грешките по DR степен",
+        "",
+    ])
 
     for item in result.get("errors_by_dr_grade", []):
         if item["n"] == 0:
@@ -491,13 +613,6 @@ def generate_bulgarian_report(result: dict[str, Any]) -> str:
 
     lines.extend([
         "",
-        "## Научни ограничения",
-        "",
-        "- Този анализ е изследователски и не установява клинична безопасност.",
-        "- Външната оценка показва значителен domain shift.",
-        "- Резултатите са специфични за DeepDRiD и не се обобщават автоматично.",
-        "- Не са направени промени в модела или праговете въз основа на този анализ.",
-        "",
         "## Изходни файлове",
         "",
         f"- JSON: {result.get('output_json', 'N/A')}",
@@ -514,15 +629,16 @@ def main() -> None:
     if not args.input.is_file():
         raise FileNotFoundError(f"Input file not found: {args.input}")
 
+    # Calculate input file SHA-256
+    input_sha256 = sha256_file(args.input)
+
     # Load predictions
     frame = pd.read_csv(args.input)
     print(f"Loaded {len(frame)} predictions from {args.input}")
 
-    # Validate data
-    validation = validate_predictions_csv(frame)
-    print(f"Validation: {validation['total_rows']} rows, "
-          f"{len(validation['duplicate_image_ids'])} duplicates, "
-          f"{len(validation['invalid_dr_grades'])} invalid grades")
+    # Validate data with actionable error messages
+    validation = validate_predictions_csv(frame, args.classification_threshold)
+    print(f"Validation passed: {validation['total_rows']} rows")
 
     # Perform analyses
     print("Running error analysis by DR grade...")
@@ -554,11 +670,49 @@ def main() -> None:
         args.classification_threshold,
     )
 
-    # Compile results
+    print("Calculating overall metrics...")
+    overall_metrics = calculate_overall_metrics(frame, args.classification_threshold)
+
+    # Create output directory
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write CSV with detailed disagreements
+    csv_path = None
+    if eye_disagreements["disagreements"]:
+        disagreements_df = pd.DataFrame(eye_disagreements["disagreements"])
+        csv_path = args.output_dir / "eye_pair_disagreements.csv"
+        disagreements_df.to_csv(csv_path, index=False)
+        print(f"Wrote disagreements CSV to {csv_path}")
+
+    # Write Bulgarian report
+    report = generate_bulgarian_report({
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "input_file": str(args.input),
+        "input_sha256": input_sha256,
+        "total_images": int(len(frame)),
+        "total_patients": int(frame["patient_id"].nunique()),
+        "dr_eligible_images": int(len(frame[frame["dr_grade"] != UNGRADABLE_DR_GRADE])),
+        "overall_metrics": overall_metrics,
+        "errors_by_dr_grade": errors_by_dr_grade,
+        "errors_by_quality": errors_by_quality,
+        "errors_by_partition": errors_by_partition,
+        "errors_by_gate": errors_by_gate,
+        "calibration": calibration,
+        "eye_disagreements": eye_disagreements,
+        "bootstrap_intervals": bootstrap_intervals,
+        "output_json": str(args.output_dir / "failure_analysis.json"),
+        "output_csv": str(csv_path) if csv_path else None,
+    })
+    report_path = args.output_dir / "FAILURE_ANALYSIS_REPORT_BG.md"
+    report_path.write_text(report, encoding="utf-8")
+    print(f"Wrote Bulgarian report to {report_path}")
+
+    # Compile final result with all metadata
     result = {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "input_file": str(args.input),
+        "input_sha256": input_sha256,
         "total_images": int(len(frame)),
         "total_patients": int(frame["patient_id"].nunique()),
         "dr_eligible_images": int(len(frame[frame["dr_grade"] != UNGRADABLE_DR_GRADE])),
@@ -568,6 +722,7 @@ def main() -> None:
             "seed": args.bootstrap_seed,
         },
         "validation": validation,
+        "overall_metrics": overall_metrics,
         "errors_by_dr_grade": errors_by_dr_grade,
         "errors_by_quality": errors_by_quality,
         "errors_by_partition": errors_by_partition,
@@ -576,36 +731,22 @@ def main() -> None:
         "calibration": calibration,
         "eye_disagreements": eye_disagreements,
         "bootstrap_intervals": bootstrap_intervals,
+        "output_json": str(args.output_dir / "failure_analysis.json"),
+        "output_csv": str(csv_path) if csv_path else None,
+        "output_report": str(report_path),
+        "model_frozen": True,
+        "model_version": "v0.3",
+        "analysis_type": "post_hoc_research",
+        "designated_for": "failure_mode_analysis_only",
     }
 
-    # Create output directory
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Write JSON
+    # Write JSON after all paths and metadata are populated
     json_path = args.output_dir / "failure_analysis.json"
     json_path.write_text(
         json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False),
         encoding="utf-8",
     )
     print(f"Wrote JSON to {json_path}")
-
-    # Write CSV with detailed disagreements
-    if eye_disagreements["disagreements"]:
-        disagreements_df = pd.DataFrame(eye_disagreements["disagreements"])
-        csv_path = args.output_dir / "eye_pair_disagreements.csv"
-        disagreements_df.to_csv(csv_path, index=False)
-        print(f"Wrote disagreements CSV to {csv_path}")
-        result["output_csv"] = str(csv_path)
-    else:
-        result["output_csv"] = None
-
-    result["output_json"] = str(json_path)
-
-    # Write Bulgarian report
-    report = generate_bulgarian_report(result)
-    report_path = args.output_dir / "FAILURE_ANALYSIS_REPORT_BG.md"
-    report_path.write_text(report, encoding="utf-8")
-    print(f"Wrote Bulgarian report to {report_path}")
 
     # Print summary
     print("\n" + "=" * 60)
@@ -614,8 +755,16 @@ def main() -> None:
     print(f"Total images: {result['total_images']}")
     print(f"Total patients: {result['total_patients']}")
     print(f"DR-eligible images: {result['dr_eligible_images']}")
-    print(f"ECE: {calibration.get('ece', 'N/A'):.4f}")
-    print(f"Brier score: {calibration.get('brier', 'N/A'):.4f}")
+
+    if overall_metrics.get("metrics"):
+        metrics = overall_metrics["metrics"]
+        print(f"AUROC: {metrics.get('auroc', 'N/A'):.4f}")
+        print(f"Accuracy: {metrics.get('accuracy', 'N/A'):.4f}")
+        print(f"Sensitivity: {metrics.get('sensitivity', 'N/A'):.4f}")
+        print(f"Specificity: {metrics.get('specificity', 'N/A'):.4f}")
+        print(f"Brier score: {metrics.get('brier', 'N/A'):.4f}")
+        print(f"ECE: {metrics.get('ece', 'N/A'):.4f}")
+
     print(f"Eye pairs with disagreement: {eye_disagreements['disagreement_count']}/{eye_disagreements['total_pairs']}")
     print("=" * 60)
 
